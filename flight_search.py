@@ -22,18 +22,18 @@ THRESHOLD_TOTAL = 1800   # Total ambos round trips
 # ── Búsquedas a ejecutar ─────────────────────────────────────────────────────
 # RT1: EZE ↔ Europa | salida Oct 19-25, vuelta Nov 19-30
 RT1_SEARCHES = [
-    ("EZE", "MAD", "2026-10-19", "2026-11-23"),
-    ("EZE", "MAD", "2026-10-22", "2026-11-25"),
-    ("EZE", "LIS", "2026-10-20", "2026-11-23"),
     ("EZE", "BCN", "2026-10-21", "2026-11-24"),
+    ("EZE", "MAD", "2026-10-19", "2026-11-23"),
+    ("EZE", "AMS", "2026-10-20", "2026-11-23"),
+    ("EZE", "CDG", "2026-10-22", "2026-11-25"),
 ]
 
 # RT2: Europa ↔ Japón | salida ~Oct 26-Nov 1, vuelta 11-12 días después
 RT2_SEARCHES = [
-    ("MAD", "NRT", "2026-10-27", "2026-11-08"),
-    ("MAD", "HND", "2026-10-27", "2026-11-08"),
-    ("LIS", "NRT", "2026-10-27", "2026-11-08"),
     ("BCN", "NRT", "2026-10-28", "2026-11-09"),
+    ("MAD", "NRT", "2026-10-27", "2026-11-08"),
+    ("AMS", "NRT", "2026-10-27", "2026-11-08"),
+    ("CDG", "NRT", "2026-10-27", "2026-11-08"),
 ]
 
 # ── Funciones ────────────────────────────────────────────────────────────────
@@ -153,8 +153,7 @@ def format_email(results_rt1, results_rt2, combos):
     if alert:
         banner = f"""
         <div class="alert-box">
-          🚨 <b>OFERTA DETECTADA</b> — USD {best['total_pp']:.0f}/persona
-          (total x4: <b>USD {best['total_x4']:.0f}</b>)
+          🚨 <b>OFERTA DETECTADA</b> — USD {best['total_pp']:.0f} por persona
         </div>
         """
 
@@ -178,7 +177,6 @@ def format_email(results_rt1, results_rt2, combos):
           <td>{c['rt2']['airline']} · {stops_label(c['rt2']['stops'])}</td>
           <td class="{price_class(c['rt2']['price_pp'], THRESHOLD_RT2)}">USD {c['rt2']['price_pp']:.0f}</td>
           <td class="{cls}"><b>USD {c['total_pp']:.0f}</b></td>
-          <td class="{cls}"><b>USD {c['total_x4']:.0f}</b></td>
         </tr>
         """
 
@@ -188,7 +186,7 @@ def format_email(results_rt1, results_rt2, combos):
       <tr>
         <th>RT1 Ruta</th><th>RT1 Fechas</th><th>RT1 Vuelo</th><th>RT1 $/pp</th>
         <th>RT2 Ruta</th><th>RT2 Fechas</th><th>RT2 Vuelo</th><th>RT2 $/pp</th>
-        <th>Total $/pp</th><th>Total x4</th>
+        <th>Total $/pp</th>
       </tr>
       {rows_combo}
     </table>
@@ -204,8 +202,7 @@ def format_email(results_rt1, results_rt2, combos):
           <td>{r['outbound']} / {r['return']}</td>
           <td>{r['airline']}</td>
           <td>{stops_label(r['stops'])}</td>
-          <td class="{cls}">USD {r['price_pp']:.0f}/pp</td>
-          <td>USD {r['price_total']:.0f} total</td>
+          <td class="{cls}">USD {r['price_pp']:.0f}</td>
         </tr>
         """
 
@@ -219,8 +216,7 @@ def format_email(results_rt1, results_rt2, combos):
           <td>{r['outbound']} / {r['return']}</td>
           <td>{r['airline']}</td>
           <td>{stops_label(r['stops'])}</td>
-          <td class="{cls}">USD {r['price_pp']:.0f}/pp</td>
-          <td>USD {r['price_total']:.0f} total</td>
+          <td class="{cls}">USD {r['price_pp']:.0f}</td>
         </tr>
         """
 
@@ -228,7 +224,7 @@ def format_email(results_rt1, results_rt2, combos):
     <h3>RT1 — Argentina ↔ Europa</h3>
     <p>Umbral "oferta": <b>USD {THRESHOLD_RT1}/pp</b></p>
     <table>
-      <tr><th>Ruta</th><th>Fechas</th><th>Aerolínea</th><th>Escalas</th><th>Precio/pp</th><th>Total x4</th></tr>
+      <tr><th>Ruta</th><th>Fechas</th><th>Aerolínea</th><th>Escalas</th><th>Precio/pp</th></tr>
       {rows_rt1}
     </table>
     """
@@ -237,7 +233,7 @@ def format_email(results_rt1, results_rt2, combos):
     <h3>RT2 — Europa ↔ Japón</h3>
     <p>Umbral "oferta": <b>USD {THRESHOLD_RT2}/pp</b></p>
     <table>
-      <tr><th>Ruta</th><th>Fechas</th><th>Aerolínea</th><th>Escalas</th><th>Precio/pp</th><th>Total x4</th></tr>
+      <tr><th>Ruta</th><th>Fechas</th><th>Aerolínea</th><th>Escalas</th><th>Precio/pp</th></tr>
       {rows_rt2}
     </table>
     """
@@ -314,9 +310,9 @@ def main():
     if combos:
         best = combos[0]
         if best["total_pp"] < THRESHOLD_TOTAL:
-            subject = f"🚨 OFERTA VIAJE! USD {best['total_pp']:.0f}/pp · Total x4 USD {best['total_x4']:.0f}"
+            subject = f"🚨 OFERTA VIAJE! USD {best['total_pp']:.0f} por persona"
         else:
-            subject = f"✈️ Flight Update — Mejor precio: USD {best['total_pp']:.0f}/pp (x4: USD {best['total_x4']:.0f})"
+            subject = f"✈️ Flight Update — Mejor precio: USD {best['total_pp']:.0f}/persona"
     else:
         subject = "✈️ Flight Update — Sin combinaciones disponibles"
 
