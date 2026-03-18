@@ -1,0 +1,30 @@
+name: Daily Flight Search
+
+on:
+  schedule:
+    - cron: '0 13 * * *'   # 10:00 AM Argentina (UTC-3)
+  workflow_dispatch:         # permite correrlo manualmente desde GitHub
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run flight search
+        env:
+          SERPAPI_KEY:    ${{ secrets.SERPAPI_KEY }}
+          EMAIL_FROM:     ${{ secrets.EMAIL_FROM }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_TO:       ${{ secrets.EMAIL_TO }}
+        run: python flight_search.py
