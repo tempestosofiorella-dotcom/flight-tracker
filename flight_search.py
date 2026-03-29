@@ -101,6 +101,13 @@ def search_flights(origin, destination, outbound_date, return_date):
         duration = best_flight.get("total_duration", "")
         stops = len(best_flight["flights"]) - 1
 
+    # DEBUG: mostrar qué campos trae el vuelo (remover después)
+    if best_flight:
+        print(f"  DEBUG keys: {list(best_flight.keys())}")
+        for k in ["booking_token", "departure_token", "token", "link", "url"]:
+            if best_flight.get(k):
+                print(f"  DEBUG {k}: {str(best_flight[k])[:80]}")
+
     # booking_token es el parámetro tfs de Google Flights → link directo al vuelo
     booking_token = best_flight.get("booking_token") if best_flight else None
     if booking_token:
