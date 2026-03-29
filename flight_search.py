@@ -5,7 +5,6 @@ import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
-from urllib.parse import quote
 
 # ── Config ───────────────────────────────────────────────────────────────────
 SERPAPI_KEY    = os.environ["SERPAPI_KEY"]
@@ -38,14 +37,12 @@ RT2_SEARCHES = [
 ]
 
 # ── Funciones ────────────────────────────────────────────────────────────────
-def build_gflights_url(origin, destination, outbound_date, return_date):
-    """Construye una URL de Google Flights pre-cargada con la búsqueda."""
-    query = (
-        f"round trip flights {origin} to {destination} "
-        f"departing {outbound_date} returning {return_date} "
-        f"{PASSENGERS} passengers economy"
+def build_search_url(origin, destination, outbound_date, return_date):
+    """Construye URL de Kayak pre-cargada con ruta, fechas y pasajeros."""
+    return (
+        f"https://www.kayak.com/flights/{origin}-{destination}"
+        f"/{outbound_date}/{return_date}/{PASSENGERS}adults?sort=price_a"
     )
-    return f"https://www.google.com/travel/flights?q={quote(query)}"
 
 
 def search_flights(origin, destination, outbound_date, return_date):
@@ -101,12 +98,7 @@ def search_flights(origin, destination, outbound_date, return_date):
         duration = best_flight.get("total_duration", "")
         stops = len(best_flight["flights"]) - 1
 
-    # departure_token es el parámetro tfs de Google Flights → link directo al vuelo
-    departure_token = best_flight.get("departure_token") if best_flight else None
-    if departure_token:
-        link = f"https://www.google.com/travel/flights?tfs={departure_token}&curr=USD&hl=es"
-    else:
-        link = build_gflights_url(origin, destination, outbound_date, return_date)
+    link = build_search_url(origin, destination, outbound_date, return_date)
 
     return {
         "origin":       origin,
