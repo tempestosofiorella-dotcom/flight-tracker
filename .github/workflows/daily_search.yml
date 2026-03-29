@@ -23,7 +23,6 @@ jobs:
 
       - name: Run flight search
         env:
-          SERPAPI_KEY:    ${{ secrets.SERPAPI_KEY }}
           EMAIL_FROM:     ${{ secrets.EMAIL_FROM }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           EMAIL_TO:       ${{ secrets.EMAIL_TO }}
