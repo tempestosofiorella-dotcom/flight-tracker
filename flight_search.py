@@ -1,3 +1,5 @@
+import requests
+import json
 import smtplib
 import os
 from email.mime.text import MIMEText
@@ -5,13 +7,8 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from urllib.parse import quote
 
-from fli.search import SearchFlights
-from fli.models import (
-    Airport, PassengerInfo, SeatType, MaxStops, SortBy,
-    TripType, FlightSearchFilters, FlightSegment
-)
-
 # ── Config ───────────────────────────────────────────────────────────────────
+SERPAPI_KEY    = os.environ["SERPAPI_KEY"]
 EMAIL_FROM     = os.environ["EMAIL_FROM"]
 EMAIL_PASSWORD = os.environ["EMAIL_PASSWORD"]
 EMAIL_TO       = os.environ["EMAIL_TO"]
@@ -43,7 +40,6 @@ RT2_SEARCHES = [
 # ── Funciones ────────────────────────────────────────────────────────────────
 def build_gflights_url(origin, destination, outbound_date, return_date):
     """Construye una URL de Google Flights pre-cargada con la búsqueda."""
-    # Formato de URL de Google Travel Flights con query string
     query = (
         f"round trip flights {origin} to {destination} "
         f"departing {outbound_date} returning {return_date} "
@@ -53,66 +49,68 @@ def build_gflights_url(origin, destination, outbound_date, return_date):
 
 
 def search_flights(origin, destination, outbound_date, return_date):
-    # Convertir string IATA → enum Airport
-    try:
-        orig_airport = Airport[origin]
-        dest_airport = Airport[destination]
-    except KeyError as e:
-        print(f"  ERROR: Aeropuerto no encontrado: {e}")
-        return None
-
-    filters = FlightSearchFilters(
-        trip_type=TripType.ROUND_TRIP,
-        passenger_info=PassengerInfo(adults=PASSENGERS),
-        flight_segments=[
-            FlightSegment(
-                departure_airport=[[orig_airport, 0]],
-                arrival_airport=[[dest_airport, 0]],
-                travel_date=outbound_date,
-            ),
-            FlightSegment(
-                departure_airport=[[dest_airport, 0]],
-                arrival_airport=[[orig_airport, 0]],
-                travel_date=return_date,
-            ),
-        ],
-        stops=MaxStops.ONE_STOP_OR_FEWER,
-        seat_type=SeatType.ECONOMY,
-        sort_by=SortBy.CHEAPEST,
-    )
+    params = {
+        "engine":         "google_flights",
+        "departure_id":   origin,
+        "arrival_id":     destination,
+        "outbound_date":  outbound_date,
+        "return_date":    return_date,
+        "currency":       "USD",
+        "hl":             "en",
+        "type":           "1",       # round trip
+        "adults":         PASSENGERS,
+        "travel_class":   "1",       # economy
+        "stops":          "2",       # max 1 escala
+        "api_key":        SERPAPI_KEY,
+    }
 
     try:
-        searcher = SearchFlights()
-        results = searcher.search(filters)
+        response = requests.get("https://serpapi.com/search", params=params, timeout=30)
+        data = response.json()
     except Exception as e:
-        print(f"  ERROR en búsqueda {origin}→{destination}: {e}")
+        print(f"  ERROR en request {origin}→{destination}: {e}")
         return None
 
-    if not results:
+    if "error" in data:
+        print(f"  ERROR API {origin}→{destination}: {data['error']}")
         return None
 
-    best = results[0]  # ordenado por CHEAPEST
+    best_price = None
+    best_flight = None
 
-    # fli devuelve precio por persona (igual que Google Flights en pantalla)
-    # Si los resultados parecen incorrectos, ajustar price_pp = best.price / PASSENGERS
-    price_pp    = best.price
-    price_total = best.price * PASSENGERS
+    for group in ["best_flights", "other_flights"]:
+        for flight in data.get(group, []):
+            price = flight.get("price")
+            if price and (best_price is None or price < best_price):
+                best_price = price
+                best_flight = flight
 
+    if best_price is None:
+        return None
+
+    # SerpApi devuelve precio TOTAL para todos los pasajeros
+    price_pp = best_price / PASSENGERS
+
+    # Extraer info del primer vuelo (ida)
     airline = ""
-    if best.legs:
-        leg = best.legs[0]
-        airline = leg.airline.value if hasattr(leg.airline, "value") else str(leg.airline)
+    stops = 0
+    duration = ""
+    if best_flight and best_flight.get("flights"):
+        first_leg = best_flight["flights"][0]
+        airline = first_leg.get("airline", "")
+        duration = best_flight.get("total_duration", "")
+        stops = len(best_flight["flights"]) - 1
 
     return {
         "origin":       origin,
         "destination":  destination,
         "outbound":     outbound_date,
         "return":       return_date,
-        "price_total":  price_total,
+        "price_total":  best_price,
         "price_pp":     price_pp,
         "airline":      airline,
-        "stops":        best.stops,
-        "duration_min": best.duration,
+        "stops":        stops,
+        "duration_min": duration,
         "link":         build_gflights_url(origin, destination, outbound_date, return_date),
     }
 
@@ -121,6 +119,7 @@ def build_combinations(results_rt1, results_rt2):
     combos = []
     for r1 in results_rt1:
         for r2 in results_rt2:
+            # El hub de salida de RT2 debe coincidir con el destino de RT1
             if r1["destination"] == r2["origin"]:
                 total_pp = r1["price_pp"] + r2["price_pp"]
                 combos.append({
@@ -266,7 +265,7 @@ def format_email(results_rt1, results_rt2, combos):
       <span class="ok">■ Naranja</span> = cerca del umbral &nbsp;
       <span class="high">■ Rojo</span> = sobre el umbral
     </p>
-    <p><small>Actualizado: {now} · {PASSENGERS} pasajeros · economy · max 1 escala · via Google Flights</small></p>
+    <p><small>Actualizado: {now} · 4 pasajeros · economy · max 1 escala</small></p>
     """
 
     html = f"<html><head>{style}</head><body>"
@@ -326,8 +325,9 @@ def main():
     print(f"\n>> Combinaciones encontradas: {len(combos)}")
     if combos:
         best = combos[0]
-        print(f"   Mejor: USD {best['total_pp']:.0f}/pp  (total x{PASSENGERS}: USD {best['total_x4']:.0f})")
+        print(f"   Mejor: USD {best['total_pp']:.0f}/pp  (total x4: USD {best['total_x4']:.0f})")
 
+    # Subject del email
     if combos:
         best = combos[0]
         if best["total_pp"] < THRESHOLD_TOTAL:
